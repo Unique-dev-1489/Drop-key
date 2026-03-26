@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>DropKey – Secure Vault</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      padding: 2rem 1.5rem;
+      transition: background 0.3s;
+    }
+
+    body.light {
+      background: linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%);
+    }
+
+    /* Glassmorphism card style (same as original but refined) */
+    .glass-card {
+      background: rgba(15, 25, 45, 0.65);
+      backdrop-filter: blur(14px);
+      border-radius: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    body.light .glass-card {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ===== THREE-LINE MENU (TOP LEFT) ===== */
+    .menu-container {
+      position: fixed;
+      top: 1.5rem;
+      left: 1.5rem;
+      z-index: 1100;
+    }
+    .menu-icon {
+      background: rgba(15, 25, 45, 0.8);
+      backdrop-filter: blur(8px);
+      width: 48px;
+      height: 48px;
+      border-radius: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.3);
+      transition: 0.2s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    body.light .menu-icon {
+      background: rgba(255,255,255,0.9);
+      border-color: rgba(0,0,0,0.15);
+    }
+    .menu-icon div {
+      width: 22px;
+      height: 2px;
+      background: white;
+      border-radius: 4px;
+      transition: 0.2s;
+    }
+    body.light .menu-icon div {
+      background: #0f172a;
+    }
+    .menu-icon:hover {
+      transform: scale(1.02);
+      background: rgba(14,165,233,0.7);
+    }
+    /* Dropdown panel */
+    .menu-dropdown {
+      position: absolute;
+      top: 58px;
+      left: 0;
+      background: rgba(15, 25, 45, 0.95);
+      backdrop-filter: blur(16px);
+      border-radius: 1.5rem;
+      padding: 0.8rem 0;
+      min-width: 180px;
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-12px);
+      transition: all 0.2s ease;
+      z-index: 1099;
+    }
+    body.light .menu-dropdown {
+      background: rgba(255,255,255,0.95);
+      border-color: rgba(0,0,0,0.1);
+    }
+    .menu-dropdown.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .menu-item {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 500;
+      color: #e2e8f0;
+      cursor: pointer;
+      transition: 0.2s;
+      font-size: 1rem;
+    }
+    body.light .menu-item {
+      color: #0f172a;
+    }
+    .menu-item i {
+      width: 24px;
+      font-size: 1.2rem;
+    }
+    .menu-item:hover {
+      background: rgba(14,165,233,0.3);
+      backdrop-filter: blur(4px);
+    }
+
+    /* header area (logo moved to adjust for menu) */
+    .header {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .logo {
+      text-align: right;
+    }
+    .logo h1 {
+      font-size: 1.9rem;
+      font-weight: 700;
+      background: linear-gradient(120deg, #a5f3fc, #7dd3fc);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .logo p {
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+    .theme-toggle {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      border-radius: 3rem;
+      padding: 0.6rem 1.2rem;
+      cursor: pointer;
+      color: white;
+      backdrop-filter: blur(4px);
+    }
+    body.light .theme-toggle {
+      background: rgba(0,0,0,0.1);
+      color: #0f172a;
+    }
+
+    /* Main views */
+    .view {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .active-view {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px);}
+      to { opacity: 1; transform: translateY(0);}
+    }
+
+    .hero-card {
+      text-align: center;
+      padding: 2.5rem 2rem;
+    }
+    .hero-card h2 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #a5f3fc, #38bdf8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero-card p {
+      color: #cbd5e1;
+      max-width: 550px;
+      margin: 0 auto 1rem;
+      line-height: 1.5;
+    }
+    body.light .hero-card p {
+      color: #1e293b;
+    }
+    .feature-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.2rem;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+    .feature-badge {
+      background: rgba(14,165,233,0.2);
+      border-radius: 40px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      backdrop-filter: blur(4px);
+    }
+
+    /* upload/retrieve forms same style */
+    .section {
+      padding: 1.8rem;
+    }
+    .section h2 {
+      font-size: 1.6rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: #e2e8f0;
+    }
+    body.light .section h2 {
+      color: #0f172a;
+    }
+    .input-group {
+      margin-bottom: 1.4rem;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: #cbd5e1;
+    }
+    body.light label {
+      color: #334155;
+    }
+    input, .file-label {
+      width: 100%;
+      padding: 0.9rem 1rem;
+      border-radius: 1.2rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.35);
+      color: white;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    body.light input {
+      background: white;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+    input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56,189,248,0.3);
+    }
+    .file-label {
+      display: inline-block;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(56,189,248,0.2);
+    }
+    button {
+      background: linear-gradient(100deg, #0ea5e9, #0284c7);
+      border: none;
+      padding: 0.8rem 1.6rem;
+      border-radius: 2rem;
+      font-weight: 600;
+      color: white;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: transform 0.2s;
+    }
+    button:active { transform: scale(0.97); }
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .result-area {
+      margin-top: 1.8rem;
+      background: rgba(0,0,0,0.3);
+      border-radius: 1.5rem;
+      padding: 1.2rem;
+    }
+    body.light .result-area {
+      background: rgba(0,0,0,0.05);
+    }
+    .code-badge {
+      background: #0f172a;
+      padding: 0.4rem 1rem;
+      border-radius: 3rem;
+      font-family: monospace;
+      font-weight: bold;
+      display: inline-block;
+      font-size: 1.2rem;
+    }
+    .preview-img {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 1rem;
+      margin-top: 0.8rem;
+      object-fit: contain;
+    }
+    .notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1e293b;
+      padding: 0.8rem 1.5rem;
+      border-radius: 3rem;
+      z-index: 1000;
+      color: white;
+      border-left: 5px solid #0ea5e9;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .timer {
+      font-size: 0.85rem;
+      font-family: monospace;
+      background: rgba(0,0,0,0.5);
+      display: inline-block;
+      padding: 0.2rem 0.8rem;
+      border-radius: 2rem;
+      margin-top: 0.5rem;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0ea5e9, #0284c7);
+      width: 0%;
+    }
+    .file-info {
+      background: rgba(0,0,0,0.3);
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      word-break: break-all;
+    }
+    @media (max-width: 780px) {
+      body { padding: 1rem; }
+      .menu-container { top: 1rem; left: 1rem; }
+      .hero-card h2 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="menu-container">
+  <div class="menu-icon" id="menuIcon">
+    <div></div><div></div><div></div>
+  </div>
+  <div class="menu-dropdown" id="menuDropdown">
+    <div class="menu-item" data-view="home"><i class="fas fa-home"></i> Home</div>
+    <div class="menu-item" data-view="upload"><i class="fas fa-cloud-upload-alt"></i> Upload File</div>
+    <div class="menu-item" data-view="codefile"><i class="fas fa-qrcode"></i> Code File</div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="header">
+    <div class="logo">
+      <h1><i class="fas fa-key"></i> DropKey</h1>
+      <p>Secure ephemeral file sharing · 48h auto-destroy</p>
+    </div>
+    <button class="theme-toggle" id="themeToggleBtn"><i class="fas fa-moon"></i> Dark / Light</button>
+  </div>
+
+  <!-- HOME VIEW -->
+  <div id="homeView" class="view active-view">
+    <div class="glass-card hero-card">
+      <h2>Welcome to DropKey</h2>
+      <p><i class="fas fa-shield-alt"></i> Your privacy-first, ephemeral vault — share any file with a self-destructing 6‑digit code. Every upload disappears after 48 hours.</p>
+      <div class="feature-grid">
+        <div class="feature-badge"><i class="fas fa-lock"></i> End-to-end encrypted</div>
+        <div class="feature-badge"><i class="fas fa-hourglass-half"></i> Auto-expiry 48h</div>
+        <div class="feature-badge"><i class="fas fa-file-pdf"></i> PDF reports</div>
+        <div class="feature-badge"><i class="fas fa-link"></i> Link or direct file</div>
+        <div class="feature-badge"><i class="fas fa-database"></i> Base64 for smaller files</div>
+      </div>
+      <p style="margin-top: 2rem;"><small>⚡ Upload images under 10MB directly, or paste external links for larger files. Retrieve using the 6-character code.</small></p>
+      <div class="action-buttons" style="justify-content: center; margin-top: 1.5rem;">
+        <button id="homeUploadBtn"><i class="fas fa-upload"></i> Share a File</button>
+        <button id="homeRetrieveBtn"><i class="fas fa-download"></i> Retrieve by Code</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPLOAD FILE VIEW -->
+  <div id="uploadView" class="view">
+    <div class="glass-card section">
+      <h2><i class="fas fa-cloud-upload-alt"></i> Upload & Share File</h2>
+      <div class="input-group">
+        <label><i class="fas fa-file"></i> Upload File (Any Type, up to 10MB for embedded)</label>
+        <input type="file" id="fileUploadInput">
+        <div id="fileNameDisplay" class="selected-file" style="font-size:0.8rem; margin-top:0.3rem;"></div>
+        <div class="progress-bar" id="uploadProgressBar" style="display: none;">
+          <div class="progress-fill" id="uploadProgressFill"></div>
+        </div>
+      </div>
+      <div class="input-group">
+        <label><i class="fas fa-link"></i> OR Paste External File Link</label>
+        <input type="text" id="fileLinkInput" placeholder="https://example.com/document.pdf">
+      </div>
+      <div class="input-group">
+        <label><i class="fas fa-tag"></i> Custom File Name *</label>
+        <input type="text" id="fileNameInput" placeholder="e.g., Important Notes.pdf">
+      </div>
+      <button id="generateBtn"><i class="fas fa-magic"></i> Generate Code & Share</button>
+      <div id="uploadResult" class="result-area" style="display: none;"></div>
+    </div>
+  </div>
+
+  <!-- CODE FILE VIEW (retrieve by code) -->
+  <div id="codefileView" class="view">
+    <div class="glass-card section">
+      <h2><i class="fas fa-qrcode"></i> Retrieve with Code</h2>
+      <div class="input-group">
+        <label><i class="fas fa-key"></i> Enter 6-Character Code</label>
+        <input type="text" id="retrieveCode" maxlength="6" placeholder="e.g., GY4P8I" style="text-transform: uppercase;">
+      </div>
+      <button id="retrieveBtn"><i class="fas fa-search"></i> Fetch File</button>
+      <div id="retrieveResult" class="result-area" style="display: none;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ========== FIREBASE CONFIG ==========
+  const firebaseConfig = {
+    apiKey: "AIzaSyByohCNSUWs1nsoL0txzZOjrbyWLM-BYxo",
+    authDomain: "drop-key.firebaseapp.com",
+    databaseURL: "https://drop-key-default-rtdb.firebaseio.com",
+    projectId: "drop-key",
+    storageBucket: "drop-key.firebasestorage.app",
+    messagingSenderId: "771535582412",
+    appId: "1:771535582412:web:6488cc52d1a970adb57e69"
+  };
+  let db;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    console.log("✅ Firebase ready");
+  } catch(e) { console.error(e); }
+
+  // Helpers
+  function showNotification(msg, isError = false) {
+    const toast = document.createElement('div');
+    toast.className = 'notification';
+    toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i> ${msg}`;
+    toast.style.background = isError ? '#991b1b' : '#0f3b2c';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  function generateRandomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i=0;i<6;i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    return code;
+  }
+  async function getUniqueCode() {
+    for(let i=0;i<8;i++) {
+      const cand = generateRandomCode();
+      const snap = await db.ref(`files/${cand}`).once('value');
+      if(!snap.exists()) return cand;
+    }
+    throw new Error("Cannot generate unique code");
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+    });
+  }
+
+  async function uploadFileHandler(file) {
+    const maxSize = 10 * 1024 * 1024;
+    if(file.size <= maxSize) {
+      const base64 = await fileToBase64(file);
+      return { url: base64, method: 'base64', fileName: file.name, fileSize: file.size };
+    } else {
+      throw new Error(`File size ${(file.size/1024/1024).toFixed(2)}MB exceeds 10MB limit. Please use external link option.`);
+    }
+  }
+
+  async function saveFileData(code, name, dataUrl, fileInfo, type) {
+    const now = Date.now();
+    const expiryAt = now + 48*60*60*1000;
+    const record = { code, name: name.trim(), data: dataUrl, fileId: null, originalName: fileInfo.fileName || null, fileSize: fileInfo.fileSize || null, storageMethod: fileInfo.method || 'link', type, createdAt: now, expiryAt };
+    await db.ref(`files/${code}`).set(record);
+    return record;
+  }
+
+  function startTimer(expiryTimestamp, elementId) {
+    const update = () => {
+      const el = document.getElementById(elementId);
+      if(!el) return;
+      const rem = expiryTimestamp - Date.now();
+      if(rem <= 0) { el.innerHTML = "<i class='fas fa-skull'></i> Expired"; return; }
+      const h = Math.floor(rem/(1000*3600));
+      const m = Math.floor((rem%(1000*3600))/(1000*60));
+      const s = Math.floor((rem%60000)/1000);
+      el.innerHTML = `<i class="far fa-hourglass-half"></i> Expires in: ${h}h ${m}m ${s}s`;
+    };
+    update();
+    const iv = setInterval(() => { if(Date.now()>=expiryTimestamp) { clearInterval(iv); const el=document.getElementById(elementId); if(el) el.innerHTML="<i class='fas fa-clock'></i> Expired"; } else update(); }, 1000);
+    return iv;
+  }
+
+  function generatePDFReport(fileData) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(20); doc.setTextColor(14,165,233); doc.text("DropKey - Secure File Report",20,20);
+    doc.setFontSize(12); doc.setTextColor(0,0,0);
+    doc.text(`File Name: ${fileData.name}`,20,45);
+    doc.text(`Access Code: ${fileData.code}`,20,55);
+    doc.text(`Original: ${fileData.originalName || fileData.name}`,20,65);
+    doc.text(`Storage: ${fileData.storageMethod || 'link'}`,20,75);
+    if(fileData.fileSize) doc.text(`Size: ${(fileData.fileSize/1048576).toFixed(2)} MB`,20,85);
+    doc.text(`Created: ${new Date(fileData.createdAt).toLocaleString()}`,20,95);
+    doc.text(`Expires: ${new Date(fileData.expiryAt).toLocaleString()}`,20,105);
+    doc.save(`DropKey_${fileData.code}_report.pdf`);
+    showNotification("PDF report generated");
+  }
+
+  async function cleanupExpired() {
+    if(!db) return;
+    const now = Date.now();
+    const snap = await db.ref('files').once('value');
+    const files = snap.val();
+    if(!files) return;
+    const expired = [];
+    for(const [code,data] of Object.entries(files)) if(data.expiryAt && data.expiryAt <= now) expired.push(code);
+    for(const code of expired) await db.ref(`files/${code}`).remove();
+    if(expired.length) showNotification(`Cleaned ${expired.length} expired items`);
+  }
+
+  // DOM elements
+  const fileInput = document.getElementById('fileUploadInput');
+  const linkInput = document.getElementById('fileLinkInput');
+  const fileNameCustom = document.getElementById('fileNameInput');
+  const generateBtn = document.getElementById('generateBtn');
+  const uploadResultDiv = document.getElementById('uploadResult');
+  const retrieveBtn = document.getElementById('retrieveBtn');
+  const retrieveCodeInput = document.getElementById('retrieveCode');
+  const retrieveResultDiv = document.getElementById('retrieveResult');
+  const fileNameDisplay = document.getElementById('fileNameDisplay');
+
+  fileInput.addEventListener('change', (e) => {
+    if(e.target.files[0]) {
+      const f = e.target.files[0];
+      const sizeMB = (f.size/1048576).toFixed(2);
+      fileNameDisplay.innerHTML = `<i class="fas fa-check-circle" style="color:#22c55e;"></i> ${f.name} (${sizeMB} MB) ${f.size>10*1024*1024 ? '⚠️ >10MB, use link' : ''}`;
+    } else fileNameDisplay.innerHTML = '';
+  });
+
+  generateBtn.addEventListener('click', async () => {
+    const file = fileInput.files[0];
+    const link = linkInput.value.trim();
+    const customName = fileNameCustom.value.trim();
+    if(!file && !link) { showNotification("Select a file or paste link", true); return; }
+    if(!customName) { showNotification("Provide a custom file name", true); return; }
+    uploadResultDiv.style.display = 'block';
+    uploadResultDiv.innerHTML = `<div><i class="fas fa-spinner fa-pulse"></i> Processing...</div>`;
+    try {
+      let finalData = '', finalType = '', fileInfo = {};
+      if(file) {
+        const result = await uploadFileHandler(file);
+        finalData = result.url;
+        fileInfo = result;
+        finalType = 'file';
+      } else if(link) {
+        if(!link.match(/^https?:\/\//)) throw new Error("Invalid URL");
+        finalData = link;
+        finalType = 'link';
+        fileInfo = { fileName: customName, method: 'link' };
+      }
+      const uniqueCode = await getUniqueCode();
+      const saved = await saveFileData(uniqueCode, customName, finalData, fileInfo, finalType);
+      const expiryDate = new Date(saved.expiryAt).toLocaleString();
+      const createdDate = new Date(saved.createdAt).toLocaleString();
+      const isImage = file && file.type.startsWith('image/');
+      uploadResultDiv.innerHTML = `
+        <div style="text-align:center;">
+          <i class="fas fa-check-circle" style="color:#22c55e; font-size:2.5rem;"></i>
+          <h3>✨ File Shared!</h3>
+          <div style="background:rgba(14,165,233,0.2); border-radius:1rem; padding:1rem; margin:1rem 0;">
+            <div class="code-badge" style="font-size:1.8rem;">${uniqueCode}</div>
+            <div><button id="copyCodeUpload" class="copy-btn"><i class="fas fa-copy"></i> Copy Code</button>
+            <button id="pdfReportUpload"><i class="fas fa-file-pdf"></i> PDF Report</button></div>
+          </div>
+          <div class="timer" id="timerUploadArea"></div>
+          <p><strong>📄 Name:</strong> ${escapeHtml(customName)}</p>
+          <p><small>${fileInfo.fileName ? `Original: ${escapeHtml(fileInfo.fileName)}` : ''}</small></p>
+          ${fileInfo.fileSize ? `<p><small>💾 Size: ${(fileInfo.fileSize/1048576).toFixed(2)} MB</small></p>` : ''}
+          <p><small>Created: ${createdDate}</small></p>
+          <p><small>Expires: ${expiryDate}</small></p>
+          ${isImage && finalData.startsWith('data:image') ? `<img src="${finalData}" class="preview-img" alt="preview">` : ''}
+        </div>
+      `;
+      document.getElementById('copyCodeUpload')?.addEventListener('click',()=>{ navigator.clipboard.writeText(uniqueCode); showNotification("Code copied!"); });
+      document.getElementById('pdfReportUpload')?.addEventListener('click',()=> generatePDFReport(saved));
+      startTimer(saved.expiryAt, 'timerUploadArea');
+      showNotification(`Code: ${uniqueCode} ready`);
+      fileInput.value = ''; linkInput.value = ''; fileNameCustom.value = ''; fileNameDisplay.innerHTML = '';
+    } catch(err) {
+      uploadResultDiv.innerHTML = `<div style="color:#f87171;">${err.message}</div>`;
+      showNotification(err.message, true);
+    }
+  });
+
+  retrieveBtn.addEventListener('click', async () => {
+    const code = retrieveCodeInput.value.trim().toUpperCase();
+    if(!code || code.length !==6) { showNotification("Enter valid 6-char code", true); return; }
+    retrieveResultDiv.style.display = 'block';
+    retrieveResultDiv.innerHTML = `<div><i class="fas fa-spinner fa-pulse"></i> Looking for ${code}...</div>`;
+    try {
+      await cleanupExpired();
+      const snap = await db.ref(`files/${code}`).once('value');
+      const data = snap.val();
+      if(!data) throw new Error("Code not found or expired");
+      if(data.expiryAt <= Date.now()) { await db.ref(`files/${code}`).remove(); throw new Error("Code expired and removed"); }
+      const isImageFile = data.originalName && /\.(jpg|jpeg|png|gif|webp)$/i.test(data.originalName);
+      retrieveResultDiv.innerHTML = `
+        <div>
+          <h3><i class="fas fa-file"></i> ${escapeHtml(data.name)}</h3>
+          <div class="file-info"><strong>Original:</strong> ${escapeHtml(data.originalName || data.name)}<br>
+          ${data.fileSize ? `<strong>Size:</strong> ${(data.fileSize/1048576).toFixed(2)} MB<br>` : ''}
+          <strong>Storage:</strong> ${data.storageMethod === 'base64' ? 'Embedded' : 'Link'}</div>
+          <div class="action-buttons">
+            <a href="${escapeHtml(data.data)}" target="_blank" download="${escapeHtml(data.originalName || data.name)}"><button><i class="fas fa-download"></i> Download</button></a>
+            <button id="copyRetrieveLink"><i class="fas fa-copy"></i> Copy Link</button>
+            <button id="pdfRetrieveGen"><i class="fas fa-file-pdf"></i> PDF Report</button>
+          </div>
+          <div class="timer" id="timerRetrieveView"></div>
+          <hr><small>Created: ${new Date(data.createdAt).toLocaleString()}</small><br>
+          <small>Expires: ${new Date(data.expiryAt).toLocaleString()}</small>
+          ${isImageFile && data.data && data.data.startsWith('data:image') ? `<img src="${escapeHtml(data.data)}" class="preview-img" alt="preview">` : ''}
+        </div>
+      `;
+      document.getElementById('copyRetrieveLink')?.addEventListener('click',()=>{ navigator.clipboard.writeText(data.data); showNotification("Link copied"); });
+      document.getElementById('pdfRetrieveGen')?.addEventListener('click',()=> generatePDFReport(data));
+      startTimer(data.expiryAt, 'timerRetrieveView');
+    } catch(err) {
+      retrieveResultDiv.innerHTML = `<div style="color:#f87171;">${err.message}</div>`;
+      showNotification(err.message, true);
+    }
+  });
+
+  // Navigation logic (three-line menu)
+  const views = { home: document.getElementById('homeView'), upload: document.getElementById('uploadView'), codefile: document.getElementById('codefileView') };
+  function setActiveView(viewId) {
+    Object.keys(views).forEach(v => views[v].classList.remove('active-view'));
+    views[viewId].classList.add('active-view');
+    document.getElementById('menuDropdown').classList.remove('show');
+  }
+  document.querySelectorAll('.menu-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const view = item.getAttribute('data-view');
+      if(view === 'home') setActiveView('home');
+      else if(view === 'upload') setActiveView('upload');
+      else if(view === 'codefile') setActiveView('codefile');
+    });
+  });
+  document.getElementById('menuIcon').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('menuDropdown').classList.toggle('show');
+  });
+  document.addEventListener('click', (e) => {
+    if(!document.getElementById('menuContainer')?.contains(e.target) && !e.target.closest('.menu-icon')) {
+      document.getElementById('menuDropdown').classList.remove('show');
+    }
+  });
+  document.getElementById('homeUploadBtn')?.addEventListener('click',()=> setActiveView('upload'));
+  document.getElementById('homeRetrieveBtn')?.addEventListener('click',()=> setActiveView('codefile'));
+
+  // Theme toggle
+  const themeBtn = document.getElementById('themeToggleBtn');
+  themeBtn.addEventListener('click',()=>{
+    document.body.classList.toggle('light');
+    const icon = themeBtn.querySelector('i');
+    if(document.body.classList.contains('light')) { icon.classList.remove('fa-moon'); icon.classList.add('fa-sun'); }
+    else { icon.classList.remove('fa-sun'); icon.classList.add('fa-moon'); }
+  });
+
+  window.addEventListener('load', async()=> { if(db) await cleanupExpired(); showNotification("DropKey ready · Use top-left menu"); });
+  function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+</script>
+</body>
+</html>
